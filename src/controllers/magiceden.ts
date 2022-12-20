@@ -23,8 +23,7 @@ class MagicEdenParser {
 
           // analyze transaction according to the type
           if (txType) {
-            const activity = this.getActivity(txType, tx);
-            console.log(activity);
+            return this.getActivity(txType, tx);
           }
           return null;
         } else {
