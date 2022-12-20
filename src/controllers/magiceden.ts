@@ -1,19 +1,29 @@
-import { ParsedTransactionWithMeta } from '@solana/web3.js';
+import { ParsedTransactionWithMeta, PartiallyDecodedInstruction } from '@solana/web3.js';
 import connection from '../utils/connection';
 import retry from 'async-retry';
-import { ActionType, logFound } from '../types/web3';
+import { ActionType, Activity, logFound } from '../types/web3';
 import { MagicEdenV2ProgramID } from '../utils/constants';
 
 class MagicEdenParser {
     constructor() { }
 
-    public parse = async (sig: string, retries = 5) => {
-        // get parsed transaction
-        const parsedTx = retry(
+    public parse = async (sig: string, retries = 10): Promise<Activity | null> =>
+        retry(
             async () => {
+                // get parsed transaction
                 const tx = await this.parseSig(sig);
+
+                // if transaction exists
                 if (tx) {
-                    this.getType(tx);
+                    // get transaction type
+                    const txType = this.getType(tx);
+
+                    // analyze transaction according to the type
+                    if (txType) {
+                        const activity = this.getActivity(txType, tx);
+                        console.log(activity);
+                    }
+                    return null;
                 } else {
                     throw 'Null transaction returned';
                 }
@@ -27,38 +37,77 @@ class MagicEdenParser {
             }
         );
 
-        // analyze the transaction
-    };
 
-    public parseSig = async (
+    private parseSig = async (
         sigature: string
     ): Promise<ParsedTransactionWithMeta | null> =>
         await connection.getParsedTransaction(sigature, 'confirmed');
 
-    public getType = (tx: ParsedTransactionWithMeta): ActionType | null => {
+    private getType = (tx: ParsedTransactionWithMeta): ActionType | null => {
         const magicedenIx = tx.transaction.message.instructions.find(
             (ix) => ix.programId.toBase58() === MagicEdenV2ProgramID
         );
 
         if (magicedenIx && tx.meta) {
-            const logMesssages = tx.meta.logMessages;
-            if (logMesssages) {
+            const logMessages = tx.meta.logMessages;
+            if (logMessages) {
+                console.log(logMessages);
 
                 // if sell
-                if (logFound(logMesssages, 'Instruction: Sell')) {
-                    if (!logFound(logMesssages, 'Instruction: Execute Sale')) {
-                        return ActionType.LISTING;
-                    }
+                if (logFound(logMessages, 'Instruction: ExecuteSale')) {
+                    return ActionType.SALE;
+                }
+                if (logFound(logMessages, 'Instruction: Sell')) {
+                    return ActionType.LISTING;
+                }
+                if (logFound(logMessages, 'Instruction: Buy')) {
+                    return ActionType.BID;
+                }
+                if (logFound(logMessages, 'Instruction: CancelSell')) {
+                    return ActionType.DELISTING;
                 }
             }
         }
 
-        // check for the PartiallyDecodedInstruction type
-        // if(magicedenIx) {
-
-        // }
         return null;
     };
+
+    private getActivity = (txType: ActionType, tx: ParsedTransactionWithMeta): Activity | null => {
+        const ixs = tx.transaction.message.instructions;
+        console.log(ixs);
+        if (txType === ActionType.SALE) {
+            const lastIX = ixs.pop() as PartiallyDecodedInstruction;
+            return {
+                buyerWallet: lastIX.accounts[0].toBase58(),
+                sellerWallet: lastIX.accounts[1].toBase58(),
+                mint: lastIX.accounts[4].toBase58(),
+                price: this.getPrice(tx.meta?.logMessages ?? []),
+                blocktime: tx.blockTime ?? 0
+            }
+        }
+        if (txType === ActionType.LISTING) {
+
+        }
+        if (txType === ActionType.BID) {
+
+        }
+        if (txType === ActionType.DELISTING) {
+
+        }
+        return null;
+    }
+
+    private getPrice = (messages: string[]): number => {
+        const priceMessage = messages.find(message => message.includes(`"price":`));
+        if (priceMessage) {
+            const latter = priceMessage.split(`"price":`)[1];
+            const slices = latter.split(",");
+            if (slices.length > 0) {
+                return parseInt(slices[0].trim(), 10)
+            }
+        }
+        return 0;
+    }
 }
 
 export default MagicEdenParser;
