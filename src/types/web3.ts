@@ -14,4 +14,4 @@ export type Activity = {
   price: number | null;
   mint: string;
   blocktime: number;
-}
+};
