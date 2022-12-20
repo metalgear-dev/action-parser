@@ -1,4 +1,5 @@
 import {
+  LAMPORTS_PER_SOL,
   ParsedTransactionWithMeta,
   PartiallyDecodedInstruction,
 } from '@solana/web3.js';
@@ -127,7 +128,7 @@ class MagicEdenParser {
       const latter = priceMessage.split(`"price":`)[1];
       const slices = latter.split(',');
       if (slices.length > 0) {
-        return parseInt(slices[0].trim(), 10);
+        return parseInt(slices[0].trim(), 10) / LAMPORTS_PER_SOL;
       }
     }
     return 0;
