@@ -75,8 +75,8 @@ class MagicEdenParser {
     private getActivity = (txType: ActionType, tx: ParsedTransactionWithMeta): Activity | null => {
         const ixs = tx.transaction.message.instructions;
         console.log(ixs);
+        const lastIX = ixs.pop() as PartiallyDecodedInstruction;
         if (txType === ActionType.SALE) {
-            const lastIX = ixs.pop() as PartiallyDecodedInstruction;
             return {
                 buyerWallet: lastIX.accounts[0].toBase58(),
                 sellerWallet: lastIX.accounts[1].toBase58(),
@@ -86,13 +86,31 @@ class MagicEdenParser {
             }
         }
         if (txType === ActionType.LISTING) {
-
+            return {
+                buyerWallet: null,
+                sellerWallet: lastIX.accounts[0].toBase58(),
+                mint: lastIX.accounts[4].toBase58(),
+                price: this.getPrice(tx.meta?.logMessages ?? []),
+                blocktime: tx.blockTime ?? 0
+            }
         }
         if (txType === ActionType.BID) {
-
+            return {
+                buyerWallet: lastIX.accounts[0].toBase58(),
+                sellerWallet: null,
+                mint: lastIX.accounts[2].toBase58(),
+                price: this.getPrice(tx.meta?.logMessages ?? []),
+                blocktime: tx.blockTime ?? 0
+            }
         }
         if (txType === ActionType.DELISTING) {
-
+            return {
+                buyerWallet: null,
+                sellerWallet: lastIX.accounts[0].toBase58(),
+                mint: lastIX.accounts[3].toBase58(),
+                price: null,
+                blocktime: tx.blockTime ?? 0
+            }
         }
         return null;
     }

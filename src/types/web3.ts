@@ -11,7 +11,7 @@ export const logFound = (messages: string[], keyword: string): boolean =>
 export type Activity = {
   buyerWallet: string | null;
   sellerWallet: string | null;
-  price: number;
+  price: number | null;
   mint: string;
   blocktime: number;
 }
